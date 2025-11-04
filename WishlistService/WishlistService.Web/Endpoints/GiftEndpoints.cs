@@ -5,7 +5,6 @@ using WishlistService.Contracts.ViewModels;
 using WishlistService.Domain.Entities;
 using WishlistService.Web.Application.Messaging.GiftMessages.Commands;
 using WishlistService.Web.Application.Messaging.GiftMessages.Queries;
-using WishlistService.Web.Definitions.Authorizations;
 
 namespace WishlistService.Web.Endpoints;
 
@@ -24,11 +23,18 @@ internal static class GiftEndpointsExtensions
         group.MapPost("{id:guid}/reserve", async (
                     [FromServices] IMediator mediator,
                     Guid id,
-                    [FromBody] string userName, // или DTO с UserId/UserName
+                    [FromBody] ReserveGiftViewModel request, 
                     HttpContext context)
-                => await mediator.Send(new ReserveGift.Request(id, context.User.Identity!.Name!, userName), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
-            .Produces(200)
+                => await mediator.Send(new ReserveGift.Request(
+                        id,
+                        context.User.Identity!.Name!,
+                        request.ReservedById,
+                        request.ReservedByNickname,
+                        request.ReservedByFirstName,
+                        request.ReservedByLastName),
+                    context.RequestAborted))
+                    //   .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+                    .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
             .WithOpenApi();
@@ -37,9 +43,10 @@ internal static class GiftEndpointsExtensions
         group.MapPost("{id:guid}/unreserve", async (
                     [FromServices] IMediator mediator,
                     Guid id,
+                    [FromBody] string userName,
                     HttpContext context)
-                => await mediator.Send(new UnreserveGift.Request(id, context.User.Identity!.Name!), context.RequestAborted))
-            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+                => await mediator.Send(new UnreserveGift.Request(id, context.User.Identity!.Name!, userName), context.RequestAborted))
+            //   .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)

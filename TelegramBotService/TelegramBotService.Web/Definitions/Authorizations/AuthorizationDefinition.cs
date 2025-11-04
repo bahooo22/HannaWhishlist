@@ -8,10 +8,10 @@ public class AuthorizationDefinition : AppDefinition
 {
     // Используем ServiceOrderIndex и ApplicationOrderIndex
     // Аутентификация должна быть зарегистрирована ОЧЕНЬ рано (низкое число)
-    public int ServiceOrderIndex => 100; // Регистрация AddAuthentication
+    public override int ServiceOrderIndex => 100; // Регистрация AddAuthentication
 
     // Применение Middlewares (UseAuthentication/UseAuthorization) должно быть раньше, чем Endpoints
-    public int ApplicationOrderIndex => 100;
+    public override int ApplicationOrderIndex => 100;
 
     public override void ConfigureServices(WebApplicationBuilder builder)
     {

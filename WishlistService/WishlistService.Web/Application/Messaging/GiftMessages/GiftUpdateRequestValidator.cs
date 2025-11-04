@@ -19,8 +19,11 @@ public class GiftUpdateRequestValidator : AbstractValidator<UpdateGift.Request>
             RuleFor(x => x.Model.Link)
                 .MaximumLength(1000);
 
-            RuleFor(x => x.Model.ReservedBy)
-                .MaximumLength(255);
+            // Простая валидация полей пользователя
+            RuleFor(x => x.Model.ReservedById).MaximumLength(100);
+            RuleFor(x => x.Model.ReservedByNickname).MaximumLength(100);
+            RuleFor(x => x.Model.ReservedByFirstName).MaximumLength(100);
+            RuleFor(x => x.Model.ReservedByLastName).MaximumLength(100);
 
             RuleFor(x => x.Model.ReservedAt)
                 .LessThanOrEqualTo(DateTime.UtcNow)

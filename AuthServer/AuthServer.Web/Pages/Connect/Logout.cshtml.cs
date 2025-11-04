@@ -32,10 +32,9 @@ namespace AuthServer.Web.Pages.Connect
             // authentication options shouldn't be used, a specific scheme can be specified here.
             await HttpContext.SignOutAsync();
 
-            var properties = new AuthenticationProperties(new Dictionary<string, string>
+            var properties = new AuthenticationProperties(new Dictionary<string, string?>
             {
-                // While not required, the specification encourages sending an id_token_hint
-                // parameter containing an identity token returned by the server for this user.
+                // Свойство IdentityTokenHint теперь должно быть string?
                 [OpenIddictClientAspNetCoreConstants.Properties.IdentityTokenHint] = result.Properties.GetTokenValue(OpenIddictClientAspNetCoreConstants.Tokens.BackchannelIdentityToken)
             })
             {

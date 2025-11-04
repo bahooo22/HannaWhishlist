@@ -1,4 +1,4 @@
-using Calabonga.OperationResults;
+﻿using Calabonga.OperationResults;
 using Calabonga.PagedListCore;
 using Calabonga.PredicatesBuilder;
 using Calabonga.UnitOfWork;
@@ -70,9 +70,21 @@ public class GetGiftPaged
                 return predicate;
             }
 
-            predicate = predicate.And(x => x.Title.Contains(search));
-            predicate = predicate.Or(x => x.Link != null && x.Link.Contains(search));
-            predicate = predicate.Or(x => x.ReservedBy != null && x.ReservedBy.Contains(search));
+            var searchLower = search.ToLower();
+
+            // Поиск по основным полям подарка
+            predicate = predicate.And(x => x.Title.ToLower().Contains(searchLower));
+            predicate = predicate.Or(x => x.Link != null && x.Link.ToLower().Contains(searchLower));
+
+            // Поиск по статусу (например, "free", "reserved")
+            predicate = predicate.Or(x => x.Status.ToString().ToLower().Contains(searchLower));
+
+            // Поиск по полям пользователя
+            predicate = predicate.Or(x => x.ReservedById != null && x.ReservedById.ToLower().Contains(searchLower));
+            predicate = predicate.Or(x => x.ReservedByNickname != null && x.ReservedByNickname.ToLower().Contains(searchLower));
+            predicate = predicate.Or(x => x.ReservedByFirstName != null && x.ReservedByFirstName.ToLower().Contains(searchLower));
+            predicate = predicate.Or(x => x.ReservedByLastName != null && x.ReservedByLastName.ToLower().Contains(searchLower));
+
             return predicate;
         }
     }

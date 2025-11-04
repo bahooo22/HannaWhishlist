@@ -2,18 +2,10 @@
 
 namespace TelegramBotService.Web.Application.Services
 {
-    public class AuthTokenService
+    public class AuthTokenService(HttpClient httpClient, IConfiguration configuration)
     {
-        private readonly HttpClient _httpClient;
-        private readonly IConfiguration _configuration;
         private string? _accessToken;
         private DateTime _expiresAt;
-
-        public AuthTokenService(HttpClient httpClient, IConfiguration configuration)
-        {
-            _httpClient = httpClient;
-            _configuration = configuration;
-        }
 
         public async Task<string> GetTokenAsync()
         {
@@ -24,10 +16,10 @@ namespace TelegramBotService.Web.Application.Services
             }
 
             // Берём client_id и secret из конфигурации (секреты!)
-            var clientId = _configuration["Auth:ClientId"];
-            var clientSecret = _configuration["Auth:ClientSecret"];
-            var scope = _configuration["Auth:Scope"] ?? "api";
-            var authServerUrl = _configuration["Auth:Url"] ?? "https://localhost:10001";
+            var clientId = configuration["Auth:ClientId"];
+            var clientSecret = configuration["Auth:ClientSecret"];
+            var scope = configuration["Auth:Scope"] ?? "api";
+            var authServerUrl = configuration["Auth:Url"] ?? "https://localhost:10001";
 
             var body = new Dictionary<string, string>
             {
@@ -37,7 +29,7 @@ namespace TelegramBotService.Web.Application.Services
                 ["scope"] = scope
             };
 
-            var response = await _httpClient.PostAsync(
+            var response = await httpClient.PostAsync(
                 $"{authServerUrl}/connect/token",
                 new FormUrlEncodedContent(body));
 

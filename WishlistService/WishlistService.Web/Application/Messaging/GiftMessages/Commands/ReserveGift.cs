@@ -1,4 +1,4 @@
-using Calabonga.OperationResults;
+﻿using Calabonga.OperationResults;
 using Calabonga.UnitOfWork;
 using Mediator;
 using WishlistService.Contracts.ViewModels;
@@ -12,7 +12,13 @@ namespace WishlistService.Web.Application.Messaging.GiftMessages.Commands;
 /// </summary>
 public static class ReserveGift
 {
-    public record Request(Guid GiftId, string UserId, string UserName)
+    public record Request(
+        Guid GiftId,
+        string UserId,             // AuthServer ID
+        string? ReservedById,      // Новый: Telegram User ID (числовой, если нужен)
+        string? ReservedByNickname, // @username (для проверки прав)
+        string? ReservedByFirstName,
+        string? ReservedByLastName)
         : IRequest<Operation<GiftViewModel, string>>;
 
     public class Handler(IUnitOfWork unitOfWork)
@@ -28,13 +34,16 @@ public static class ReserveGift
                 return Operation.Error($"Gift with Id: {request.GiftId} not found");
             }
 
-            if (entity.Status == GiftStatus.Reserved && entity.ReservedBy != request.UserId)
+            if (entity.Status == GiftStatus.Reserved && entity.ReservedById != request.UserId)
             {
                 return Operation.Error("Gift already reserved by another user");
             }
 
             entity.Status = GiftStatus.Reserved;
-            entity.ReservedBy = request.UserName;
+            entity.ReservedById = request.ReservedById;
+            entity.ReservedByNickname = request.ReservedByNickname;
+            entity.ReservedByFirstName = request.ReservedByFirstName;
+            entity.ReservedByLastName = request.ReservedByLastName;
             entity.ReservedAt = DateTime.UtcNow;
 
             repository.Update(entity);

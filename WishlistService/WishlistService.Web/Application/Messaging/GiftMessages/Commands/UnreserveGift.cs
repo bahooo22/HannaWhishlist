@@ -1,4 +1,4 @@
-using Calabonga.OperationResults;
+﻿using Calabonga.OperationResults;
 using Calabonga.UnitOfWork;
 using Mediator;
 using WishlistService.Contracts.ViewModels;
@@ -12,7 +12,10 @@ namespace WishlistService.Web.Application.Messaging.GiftMessages.Commands;
 /// </summary>
 public static class UnreserveGift
 {
-    public record Request(Guid GiftId, string UserId)
+    public record Request(
+        Guid GiftId,
+        string UserId,              // AuthServer ID
+        string? ReservedByNickname)
         : IRequest<Operation<GiftViewModel, string>>;
 
     public class Handler(IUnitOfWork unitOfWork)
@@ -21,20 +24,23 @@ public static class UnreserveGift
         public async ValueTask<Operation<GiftViewModel, string>> Handle(Request request, CancellationToken _)
         {
             var repository = unitOfWork.GetRepository<Gift>();
-            var entity = await repository.FindAsync(request.GiftId);
+            var entity = await repository.FindAsync(request.GiftId, CancellationToken.None);
 
             if (entity == null)
             {
                 return Operation.Error("Gift not found");
             }
 
-            if (entity.Status != GiftStatus.Reserved || entity.ReservedBy != request.UserId)
+            if (entity.Status != GiftStatus.Reserved || entity.ReservedByNickname != request.ReservedByNickname)
             {
                 return Operation.Error("You cannot unreserve this gift");
             }
 
             entity.Status = GiftStatus.Free;
-            entity.ReservedBy = null;
+            entity.ReservedById = null;
+            entity.ReservedByNickname = null;
+            entity.ReservedByFirstName = null;
+            entity.ReservedByLastName = null;
             entity.ReservedAt = null;
 
             repository.Update(entity);

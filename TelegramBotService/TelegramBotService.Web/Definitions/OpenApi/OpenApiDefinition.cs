@@ -11,10 +11,10 @@ namespace TelegramBotService.Web.Definitions.OpenApi
     public class OpenApiDefinition : AppDefinition
     {
         // Регистрация Swagger/OpenApi должна быть ПОЗЖЕ (большее число)
-        public int ServiceOrderIndex => 200; // Регистрация AddOpenApi
+        public override int ServiceOrderIndex => 200; // Регистрация AddOpenApi
 
         // Использование Swagger UI должно быть ПОЗЖЕ
-        public int ApplicationOrderIndex => 200;
+        public override int ApplicationOrderIndex => 200;
 
         // -------------------------------------------------------
         // ATTENTION!
