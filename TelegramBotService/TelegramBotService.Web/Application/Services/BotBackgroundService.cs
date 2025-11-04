@@ -49,12 +49,96 @@ public class BotBackgroundService : BackgroundService
 
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
     {
-        var chatId = update.Message.Chat.Id;
-        var text = update.Message.Text;
-
-
         if (update.Message is { } message)
         {
+            var chatId = update.Message.Chat.Id;
+            var text = update.Message.Text;
+
+            if (update.Message?.Text?.StartsWith("/addgift") == true)
+            {
+                var parts = update.Message.Text.Split(' ', 2);
+                if (parts.Length < 2)
+                {
+                    await bot.SendMessage(update.Message.Chat.Id,
+                        "Использование: /addgift Название | [ссылка]", cancellationToken: ct);
+                    return;
+                }
+
+                var args = parts[1].Split('|', 2, StringSplitOptions.TrimEntries);
+                var title = args[0];
+                var link = args.Length > 1 ? args[1] : null;
+
+                var client = _httpClientFactory.CreateClient("WishlistApi");
+                var token = await _tokenService.GetTokenAsync();
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                var model = new GiftCreateViewModel
+                {
+                    Title = title,
+                    Link = link
+                };
+
+                var response = await client.PostAsJsonAsync("api/gifts", model, ct);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    await bot.SendMessage(update.Message.Chat.Id,
+                        $"🎁 Подарок «{title}» добавлен!", cancellationToken: ct);
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync(ct);
+                    await bot.SendMessage(update.Message.Chat.Id,
+                        $"Ошибка при добавлении подарка: {error}", cancellationToken: ct);
+                }
+            }
+
+            if (text?.StartsWith("/deletegift") == true)
+            {
+                var username = update.Message.From?.Username?.ToLowerInvariant();
+                if (!_admins.Contains(username ?? ""))
+                {
+                    _logger.LogInformation($"[From TG]:username is {username} \n[From appsettings]:{_admins.FirstOrDefault()} - for /deletegift");
+                    await bot.SendMessage(chatId, "⛔ У вас нет прав для удаления подарков.", cancellationToken: ct);
+                    return;
+                }
+
+                var parts = text.Split(' ', 2);
+                if (parts.Length < 2 || !int.TryParse(parts[1], out var index))
+                {
+                    await bot.SendMessage(chatId, "Использование: /deletegift <номер>", cancellationToken: ct);
+                    return;
+                }
+
+                var client = _httpClientFactory.CreateClient("WishlistApi");
+                var token = await _tokenService.GetTokenAsync();
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                // получаем список, сортируем так же, как в /wishlist
+                var response = await client.GetFromJsonAsync<OperationResponse<List<GiftViewModel>>>("api/gifts", ct);
+                var gifts = response?.Result?.OrderBy(g => g.Title).ToList() ?? new List<GiftViewModel>();
+
+                if (index < 1 || index > gifts.Count)
+                {
+                    await bot.SendMessage(chatId, "❌ Неверный номер подарка.", cancellationToken: ct);
+                    return;
+                }
+
+                var gift = gifts[index - 1];
+                var deleteResponse = await client.DeleteAsync($"api/gifts/{gift.Id}", ct);
+
+                if (deleteResponse.IsSuccessStatusCode)
+                {
+                    await bot.SendMessage(chatId, $"🗑 Подарок «{gift.Title}» удалён.", cancellationToken: ct);
+                }
+                else
+                {
+                    var error = await deleteResponse.Content.ReadAsStringAsync(ct);
+                    await bot.SendMessage(chatId, $"Ошибка при удалении: {error}", cancellationToken: ct);
+                }
+            }
 
             // /start
             if (text == "/start" || text == "/help")
@@ -129,6 +213,7 @@ public class BotBackgroundService : BackgroundService
         // 2. Обработка нажатия кнопки
         if (update.CallbackQuery is { } callback)
         {
+            var chatId = callback.Message.Chat.Id;
             var data = callback.Data; // например "GUID:Free" или "GUID:Reserved"
             var parts = data.Split(':');
             if (parts.Length == 2)
@@ -165,92 +250,6 @@ public class BotBackgroundService : BackgroundService
                 }
             }
         }
-        if (update.Message?.Text?.StartsWith("/addgift") == true)
-        {
-            var parts = update.Message.Text.Split(' ', 2);
-            if (parts.Length < 2)
-            {
-                await bot.SendMessage(update.Message.Chat.Id,
-                    "Использование: /addgift Название | [ссылка]", cancellationToken: ct);
-                return;
-            }
-
-            var args = parts[1].Split('|', 2, StringSplitOptions.TrimEntries);
-            var title = args[0];
-            var link = args.Length > 1 ? args[1] : null;
-
-            var client = _httpClientFactory.CreateClient("WishlistApi");
-            var token = await _tokenService.GetTokenAsync();
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            var model = new GiftCreateViewModel
-            {
-                Title = title,
-                Link = link
-            };
-
-            var response = await client.PostAsJsonAsync("api/gifts", model, ct);
-
-            if (response.IsSuccessStatusCode)
-            {
-                await bot.SendMessage(update.Message.Chat.Id,
-                    $"🎁 Подарок «{title}» добавлен!", cancellationToken: ct);
-            }
-            else
-            {
-                var error = await response.Content.ReadAsStringAsync(ct);
-                await bot.SendMessage(update.Message.Chat.Id,
-                    $"Ошибка при добавлении подарка: {error}", cancellationToken: ct);
-            }
-        }
-        if (text?.StartsWith("/deletegift") == true)
-        {
-            var username = update.Message.From?.Username?.ToLowerInvariant();
-            if (!_admins.Contains(username ?? ""))
-            {
-                _logger.LogInformation($"[From TG]:username is {username} \n[From appsettings]:{_admins.FirstOrDefault()} - for /deletegift");
-                await bot.SendMessage(chatId, "⛔ У вас нет прав для удаления подарков.", cancellationToken: ct);
-                return;
-            }
-
-            var parts = text.Split(' ', 2);
-            if (parts.Length < 2 || !int.TryParse(parts[1], out var index))
-            {
-                await bot.SendMessage(chatId, "Использование: /deletegift <номер>", cancellationToken: ct);
-                return;
-            }
-
-            var client = _httpClientFactory.CreateClient("WishlistApi");
-            var token = await _tokenService.GetTokenAsync();
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            // получаем список, сортируем так же, как в /wishlist
-            var response = await client.GetFromJsonAsync<OperationResponse<List<GiftViewModel>>>("api/gifts", ct);
-            var gifts = response?.Result?.OrderBy(g => g.Title).ToList() ?? new List<GiftViewModel>();
-
-            if (index < 1 || index > gifts.Count)
-            {
-                await bot.SendMessage(chatId, "❌ Неверный номер подарка.", cancellationToken: ct);
-                return;
-            }
-
-            var gift = gifts[index - 1];
-            var deleteResponse = await client.DeleteAsync($"api/gifts/{gift.Id}", ct);
-
-            if (deleteResponse.IsSuccessStatusCode)
-            {
-                await bot.SendMessage(chatId, $"🗑 Подарок «{gift.Title}» удалён.", cancellationToken: ct);
-            }
-            else
-            {
-                var error = await deleteResponse.Content.ReadAsStringAsync(ct);
-                await bot.SendMessage(chatId, $"Ошибка при удалении: {error}", cancellationToken: ct);
-            }
-        }
-
-
     }
 
     private Task HandleErrorAsync(ITelegramBotClient bot, Exception ex, CancellationToken ct)
