@@ -1,0 +1,32 @@
+﻿<Project>
+	<Target Name="IncrementBuildNumber" BeforeTargets="BeforeCompile">
+		<!-- Путь к файлу версии -->
+		<PropertyGroup>
+			<BuildVersionFile>$(MSBuildThisFileDirectory)build.version</BuildVersionFile>
+		</PropertyGroup>
+
+		<!-- Если файла нет — создаём -->
+		<ItemGroup Condition="!Exists('$(BuildVersionFile)')">
+			<_InitBuildVersion Include="0" />
+		</ItemGroup>
+		<WriteLinesToFile
+			Condition="!Exists('$(BuildVersionFile)')"
+			File="$(BuildVersionFile)"
+			Lines="@(_InitBuildVersion)"
+			Overwrite="true" />
+
+		<!-- Читаем текущее значение -->
+		<ReadLinesFromFile File="$(BuildVersionFile)">
+			<Output TaskParameter="Lines" PropertyName="BuildNumberRaw" />
+		</ReadLinesFromFile>
+
+		<PropertyGroup>
+			<BuildNumber>$(BuildNumberRaw.Trim())</BuildNumber>
+			<BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+			<NewBuildNumber>$([MSBuild]::Add($(BuildNumber), 1))</NewBuildNumber>
+		</PropertyGroup>
+
+		<!-- Записываем обратно -->
+		<WriteLinesToFile File="$(BuildVersionFile)" Lines="$(NewBuildNumber)" Overwrite="true" />
+	</Target>
+</Project>
