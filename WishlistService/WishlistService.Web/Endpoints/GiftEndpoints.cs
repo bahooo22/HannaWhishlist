@@ -1,11 +1,10 @@
-using Calabonga.AspNetCore.AppDefinitions;
+﻿using Calabonga.AspNetCore.AppDefinitions;
 using Mediator;
 using Microsoft.AspNetCore.Mvc;
 using WishlistService.Contracts.ViewModels;
 using WishlistService.Domain.Entities;
 using WishlistService.Web.Application.Messaging.GiftMessages.Commands;
 using WishlistService.Web.Application.Messaging.GiftMessages.Queries;
-using WishlistService.Web.Definitions.Authorizations;
 
 namespace WishlistService.Web.Endpoints;
 
@@ -27,7 +26,7 @@ internal static class GiftEndpointsExtensions
                     [FromBody] string userName, // или DTO с UserId/UserName
                     HttpContext context)
                 => await mediator.Send(new ReserveGift.Request(id, context.User.Identity!.Name!, userName), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -39,7 +38,7 @@ internal static class GiftEndpointsExtensions
                     Guid id,
                     HttpContext context)
                 => await mediator.Send(new UnreserveGift.Request(id, context.User.Identity!.Name!), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -50,7 +49,7 @@ internal static class GiftEndpointsExtensions
                     [FromServices] IMediator mediator,
                     HttpContext context)
                 => await mediator.Send(new GetGiftList.Request(), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -64,7 +63,7 @@ internal static class GiftEndpointsExtensions
                     int pageIndex = 0,
                     int pageSize = 10)
                 => await mediator.Send(new GetGiftPaged.Request(pageIndex, pageSize, search), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -76,7 +75,7 @@ internal static class GiftEndpointsExtensions
                 Guid id,
                 HttpContext context)
                 => await mediator.Send(new GetGiftById.Request(id), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -88,7 +87,7 @@ internal static class GiftEndpointsExtensions
                 Guid id,
                 HttpContext context)
                 => await mediator.Send(new DeleteGift.Request(id), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -100,7 +99,7 @@ internal static class GiftEndpointsExtensions
                 GiftCreateViewModel model,
                 HttpContext context)
                 => await mediator.Send(new PostGift.Request(model), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
@@ -113,7 +112,7 @@ internal static class GiftEndpointsExtensions
                 GiftUpdateViewModel model,
                 HttpContext context)
                 => await mediator.Send(new UpdateGift.Request(id, model), context.RequestAborted))
-            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)
