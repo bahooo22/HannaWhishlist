@@ -5,6 +5,7 @@ using WishlistService.Contracts.ViewModels;
 using WishlistService.Domain.Entities;
 using WishlistService.Web.Application.Messaging.GiftMessages.Commands;
 using WishlistService.Web.Application.Messaging.GiftMessages.Queries;
+using WishlistService.Web.Definitions.Authorizations;
 
 namespace WishlistService.Web.Endpoints;
 
@@ -26,7 +27,7 @@ internal static class GiftEndpointsExtensions
                     [FromBody] string userName, // или DTO с UserId/UserName
                     HttpContext context)
                 => await mediator.Send(new ReserveGift.Request(id, context.User.Identity!.Name!, userName), context.RequestAborted))
-            //            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
+            .RequireAuthorization(x => x.AddAuthenticationSchemes(AuthData.AuthSchemes).RequireAuthenticatedUser())
             .Produces(200)
             .ProducesProblem(401)
             .ProducesProblem(404)

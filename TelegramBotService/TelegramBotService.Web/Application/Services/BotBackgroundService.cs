@@ -3,6 +3,7 @@ using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 using WishlistService.Contracts.Responses;
 using WishlistService.Contracts.ViewModels;
 
@@ -14,17 +15,25 @@ public class BotBackgroundService : BackgroundService
     private readonly IHttpClientFactory _httpClientFactory;
     readonly ILogger<BotBackgroundService> _logger;
     private readonly AuthTokenService _tokenService;
+    private readonly HashSet<string> _admins;
 
     public BotBackgroundService(
         ITelegramBotClient bot,
         IHttpClientFactory httpClientFactory,
         AuthTokenService tokenService,
+        IConfiguration configuration,
         ILogger<BotBackgroundService> logger)
     {
         _bot = bot;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _tokenService = tokenService;
+        _admins = (configuration.GetSection("Telegram:Admins").Get<string[]>()?
+                       .Select(x => x.TrimStart('@').ToLowerInvariant())
+                   ?? Enumerable.Empty<string>())
+            .ToHashSet();
+
+        _logger.LogInformation("Loaded admins: {admins}", string.Join(",", _admins));
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,10 +49,12 @@ public class BotBackgroundService : BackgroundService
 
     private async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
     {
+        var chatId = update.Message.Chat.Id;
+        var text = update.Message.Text;
+
+
         if (update.Message is { } message)
         {
-            var chatId = message.Chat.Id;
-            var text = message.Text;
 
             // /start
             if (text == "/start" || text == "/help")
@@ -53,7 +64,9 @@ public class BotBackgroundService : BackgroundService
                     "Доступные команды:\n" +
                     "/wishlist – показать список подарков\n" +
                     "/addgift Название | [ссылка] – добавить подарок\n" +
-                    "/help – помощь по командам";
+                    "/deletegift [номер по списку] – удалить подарок (только для администраторов)\n" +
+                    "/help – помощь по командам\n" +
+                    "";
 
                 await bot.SendMessage(chatId, helpText, cancellationToken: ct);
                 return;
@@ -76,33 +89,41 @@ public class BotBackgroundService : BackgroundService
                     return;
                 }
 
-                // Заголовок
+                var sorted = gifts.OrderBy(g => g.Title).ToList();
+
                 var sb = new StringBuilder();
                 sb.AppendLine($"🎈🎀 *{EscapeMarkdown("Вишлист Анютке на 1 годик!")}* 🎀🎈");
                 sb.AppendLine(EscapeMarkdown("Скоро день рождения нашей малышки! 🍼"));
                 sb.AppendLine(EscapeMarkdown("Спасибо, что разделяете этот праздник с нами ❤️") + "\n");
 
-                // Группировка по статусу
-                foreach (var gift in gifts)
+                for (int i = 0; i < sorted.Count; i++)
                 {
+                    var gift = sorted[i];
                     var status = gift.Status.Equals("Free", StringComparison.OrdinalIgnoreCase)
                         ? "✅ Свободен"
                         : $"❌ Забронирован ({gift.ReservedBy})";
 
-                    sb.AppendLine($"🌼 *{EscapeMarkdown(gift.Title)}*");
-                    if (!string.IsNullOrEmpty(gift.Link))
-                    {
-                        sb.AppendLine($"🔗 {EscapeMarkdown(gift.Link)}");
-                    }
+                    text =
+                        $"{EscapeMarkdown((i + 1).ToString())}\\." +
+                        $" *{EscapeMarkdown(gift.Title)}*\n" +
+                        (!string.IsNullOrEmpty(gift.Link) ? $"🔗 {EscapeMarkdown(gift.Link)}\n" : "") +
+                        $"📌 {EscapeMarkdown(status)}";
 
-                    sb.AppendLine($"📌 {EscapeMarkdown(status)}\n");
+                    var button = InlineKeyboardButton.WithCallbackData(
+                        gift.Status.Equals("Free", StringComparison.OrdinalIgnoreCase)
+                            ? "Забронировать"
+                            : "Снять бронь",
+                        $"{gift.Id}:{gift.Status}"
+                    );
+
+                    await bot.SendMessage(
+                        chatId,
+                        text,
+                        parseMode: ParseMode.MarkdownV2,
+                        replyMarkup: new InlineKeyboardMarkup(button),
+                        cancellationToken: ct);
                 }
-
-                await bot.SendMessage(
-                    chatId,
-                    sb.ToString(),
-                    parseMode: ParseMode.MarkdownV2,
-                    cancellationToken: ct);
+                await bot.SendMessage(chatId, sb.ToString(), parseMode: ParseMode.MarkdownV2, cancellationToken: ct);
             }
         }
         // 2. Обработка нажатия кнопки
@@ -183,6 +204,52 @@ public class BotBackgroundService : BackgroundService
                     $"Ошибка при добавлении подарка: {error}", cancellationToken: ct);
             }
         }
+        if (text?.StartsWith("/deletegift") == true)
+        {
+            var username = update.Message.From?.Username?.ToLowerInvariant();
+            if (!_admins.Contains(username ?? ""))
+            {
+                _logger.LogInformation($"[From TG]:username is {username} \n[From appsettings]:{_admins.FirstOrDefault()} - for /deletegift");
+                await bot.SendMessage(chatId, "⛔ У вас нет прав для удаления подарков.", cancellationToken: ct);
+                return;
+            }
+
+            var parts = text.Split(' ', 2);
+            if (parts.Length < 2 || !int.TryParse(parts[1], out var index))
+            {
+                await bot.SendMessage(chatId, "Использование: /deletegift <номер>", cancellationToken: ct);
+                return;
+            }
+
+            var client = _httpClientFactory.CreateClient("WishlistApi");
+            var token = await _tokenService.GetTokenAsync();
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            // получаем список, сортируем так же, как в /wishlist
+            var response = await client.GetFromJsonAsync<OperationResponse<List<GiftViewModel>>>("api/gifts", ct);
+            var gifts = response?.Result?.OrderBy(g => g.Title).ToList() ?? new List<GiftViewModel>();
+
+            if (index < 1 || index > gifts.Count)
+            {
+                await bot.SendMessage(chatId, "❌ Неверный номер подарка.", cancellationToken: ct);
+                return;
+            }
+
+            var gift = gifts[index - 1];
+            var deleteResponse = await client.DeleteAsync($"api/gifts/{gift.Id}", ct);
+
+            if (deleteResponse.IsSuccessStatusCode)
+            {
+                await bot.SendMessage(chatId, $"🗑 Подарок «{gift.Title}» удалён.", cancellationToken: ct);
+            }
+            else
+            {
+                var error = await deleteResponse.Content.ReadAsStringAsync(ct);
+                await bot.SendMessage(chatId, $"Ошибка при удалении: {error}", cancellationToken: ct);
+            }
+        }
+
 
     }
 
@@ -193,7 +260,8 @@ public class BotBackgroundService : BackgroundService
     }
     private static string EscapeMarkdown(string text)
     {
-        var charsToEscape = new[] { "_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!" };
+        var charsToEscape = new[]
+            { "_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!" };
         foreach (var c in charsToEscape)
         {
             text = text.Replace(c, "\\" + c);
@@ -201,5 +269,6 @@ public class BotBackgroundService : BackgroundService
 
         return text;
     }
+
 
 }

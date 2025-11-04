@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /WishlistService/WishlistService.Infrastructure/Migrations
 /AuthServer/AuthServer.Infrastructure/Migrations
+/TelegramBotService/TelegramBotService.Web/appsettings.secret.json
